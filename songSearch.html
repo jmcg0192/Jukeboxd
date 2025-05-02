@@ -160,10 +160,15 @@
       const rating = parseFloat(localStorage.getItem(`rating-${item.id}`)) || 0;
       item.rating = rating;
 
-      const data = await getJSONData();
-      const users = JSON.parse(data);
+      const users = await getJSONData();  // ✅ getJSONData() already returns the array
+      console.log("Fetched users:", users);
+
+      // ✅ Find current user by username
       const userIndex = users.findIndex(u => u.Username === currentUser.Username);
-      if (userIndex === -1) return;
+      if (userIndex === -1) {
+        alert("Current user not found in database.");
+        return;
+      }
 
       const user = users[userIndex];
       const list = isAlbum ? user.selectedAlbums : user.selectedSongs;
@@ -171,13 +176,14 @@
 
       if (!exists) {
         list.push(item);
-        await putJSONData(users);
+        await putJSONData(users);  // ✅ Save entire users array back
         sessionStorage.setItem("loggedInUser", JSON.stringify(user));
         alert(`${item.title} added to your ${isAlbum ? 'album' : 'song'} list with rating ${rating}.`);
       } else {
         alert("Already in your list.");
       }
     }
+
 
     function createStarRating(id) {
       const container = document.createElement("div");

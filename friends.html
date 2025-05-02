@@ -107,7 +107,7 @@
     <div class="grid" id="albumsGrid"></div>
   </div>
 
-  <!-- Load your JSON scripts -->
+
   <script src="getJSONData.js"></script>
   <script src="putJSONData.js"></script>
 
@@ -119,6 +119,8 @@
 
     const songsGrid = document.getElementById("songsGrid");
     const albumsGrid = document.getElementById("albumsGrid");
+
+    let currentSearchedUser = null;
 
     const createStars = (rating = 0) => {
       let stars = "";
@@ -168,119 +170,95 @@
       const searchTerm = document.getElementById("searchInput").value.toLowerCase();
       if (!searchTerm) return;
 
-      const data = await getJSONData();
-      const allUsers = JSON.parse(data);
-
+      const allUsers = await getJSONData();
       const foundUser = allUsers.find(u => u.Username.toLowerCase() === searchTerm);
 
       if (foundUser) {
-        console.log("Found user:", foundUser);
-        console.log("Found user's albums:", foundUser.selectedAlbums);
+        currentSearchedUser = foundUser;
         document.getElementById("userHeader").textContent = `Viewing ${foundUser.Username}'s Profile`;
         renderSongs(foundUser.selectedSongs || []);
         renderAlbums(foundUser.selectedAlbums || []);
       } else {
         alert("User not found");
+        currentSearchedUser = null;
         renderSongs([]);
         renderAlbums([]);
       }
     };
 
-  const unfollowUser = async () => {
-    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-    if (!searchTerm) return;
+    const unfollowUser = async () => {
+      if (!currentSearchedUser) {
+        alert("Search for a user first!");
+        return;
+      }
 
-    const data = await getJSONData();
-    const allUsers = JSON.parse(data);
+      const allUsers = await getJSONData();
+      const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser"));
+      const foundUser = currentSearchedUser;
 
-    const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser"));
-    const foundUser = allUsers.find(u => u.Username.toLowerCase() === searchTerm);
+      if (!foundUser) {
+        alert("User not found!");
+        return;
+      }
 
-    if (!foundUser) {
-      alert("User not found!");
-      return;
-    }
+      if (!loggedInUser.following.includes(foundUser.Username)) {
+        alert(`You aren't following ${foundUser.Username}!`);
+        return;
+      }
 
-    // Check if the logged-in user is following the searched user
-    if (!loggedInUser.following.includes(foundUser.Username)) {
-      alert(`You aren't following ${foundUser.Username}!`);
-      return;
-    }
+      // Remove the user from the following & followers arrays
+      loggedInUser.following = loggedInUser.following.filter(name => name !== foundUser.Username);
+      foundUser.followers = foundUser.followers.filter(name => name !== loggedInUser.Username);
+      loggedInUser.following_count -= 1;
+      foundUser.follower_count -= 1;
 
-    // Remove the user from the following & followers arrays
-    const followingIndex = loggedInUser.following.indexOf(foundUser.Username);
-    if (followingIndex !== -1) loggedInUser.following.splice(followingIndex, 1);
+      // Update both users
+      const userIndex = allUsers.findIndex(u => u.Username === loggedInUser.Username);
+      const foundUserIndex = allUsers.findIndex(u => u.Username === foundUser.Username);
 
-    const followerIndex = foundUser.followers.indexOf(loggedInUser.Username);
-    if (followerIndex !== -1) foundUser.followers.splice(followerIndex, 1);
+      if (userIndex !== -1) allUsers[userIndex] = loggedInUser;
+      if (foundUserIndex !== -1) allUsers[foundUserIndex] = foundUser;
 
-    // Decrement following and follower counts
-    loggedInUser.following_count -= 1;
-    foundUser.follower_count -= 1;
+      await putJSONData(allUsers);
+      sessionStorage.setItem("loggedInUser", JSON.stringify(loggedInUser));
+      alert(`You unfollowed ${foundUser.Username}!`);
+    };
 
-    // Update both users in `allUsers`
-    const userIndex = allUsers.findIndex(u => u.Username === loggedInUser.Username);
-    const foundUserIndex = allUsers.findIndex(u => u.Username === foundUser.Username);
+    const addFriend = async () => {
+      if (!currentSearchedUser) {
+        alert("Search for a user first!");
+        return;
+      }
 
-    if (userIndex !== -1) allUsers[userIndex] = loggedInUser;
-    if (foundUserIndex !== -1) allUsers[foundUserIndex] = foundUser;
+      const allUsers = await getJSONData();
+      const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser"));
+      const foundUser = currentSearchedUser;
 
-    // Save changes to backend
-    await putJSONData(allUsers);
-    sessionStorage.setItem("loggedInUser", JSON.stringify(loggedInUser));
+      if (loggedInUser.following.includes(foundUser.Username)) {
+        alert("You're already following this user!");
+        return;
+      }
 
-    alert(`You unfollowed ${foundUser.Username}!`);
-  };
+      loggedInUser.following.push(foundUser.Username);
+      foundUser.followers.push(loggedInUser.Username);
+      loggedInUser.following_count += 1;
+      foundUser.follower_count += 1;
 
-  const addFriend = async () => {
-    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-    if (!searchTerm) return;
+      const userIndex = allUsers.findIndex(u => u.Username === loggedInUser.Username);
+      const foundUserIndex = allUsers.findIndex(u => u.Username === foundUser.Username);
 
-    const data = await getJSONData();
-    const allUsers = JSON.parse(data);
+      if (userIndex !== -1) allUsers[userIndex] = loggedInUser;
+      if (foundUserIndex !== -1) allUsers[foundUserIndex] = foundUser;
 
-    const loggedInUser = JSON.parse(sessionStorage.getItem("loggedInUser"));
-    const foundUser = allUsers.find(u => u.Username.toLowerCase() === searchTerm);
+      await putJSONData(allUsers);
+      sessionStorage.setItem("loggedInUser", JSON.stringify(loggedInUser));
+      alert(`You followed ${foundUser.Username}!`);
+    };
 
-    if (!foundUser) {
-      alert("User not found!");
-      return;
-    }
+    document.getElementById("addFriendsBtn").addEventListener("click", addFriend);
+    document.getElementById("searchBtn").addEventListener("click", searchUser);
+    document.getElementById("unfollowBtn").addEventListener("click", unfollowUser);
+  </script>
 
-    // Prevent duplicates
-    if (loggedInUser.following.includes(foundUser.Username)) {
-      alert("You're already following this user!");
-      return;
-    }
-
-    // Update the following & followers arrays
-    loggedInUser.following.push(foundUser.Username);
-    foundUser.followers.push(loggedInUser.Username);
-
-    // Increment the count properties
-    loggedInUser.following_count += 1;
-    foundUser.follower_count += 1;
-
-    // Find and update both users in `allUsers`
-    const userIndex = allUsers.findIndex(u => u.Username === loggedInUser.Username);
-    const foundUserIndex = allUsers.findIndex(u => u.Username === foundUser.Username);
-
-    if (userIndex !== -1) allUsers[userIndex] = loggedInUser;
-    if (foundUserIndex !== -1) allUsers[foundUserIndex] = foundUser;
-
-    // Save updates to backend
-    await putJSONData(allUsers);
-    sessionStorage.setItem("loggedInUser", JSON.stringify(loggedInUser));
-
-    alert(`You followed ${foundUser.Username}!`);
-  };
-
-  
-
-  // Attach function to the button
-  document.getElementById("addFriendsBtn").addEventListener("click", addFriend);
-  document.getElementById("searchBtn").addEventListener("click", searchUser);
-  document.getElementById("unfollowBtn").addEventListener("click", unfollowUser)
-</script>
 </body>
 </html>

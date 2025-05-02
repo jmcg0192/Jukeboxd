@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Profile - Jukeboxd</title>
 
-  <!-- Imported item classes -->
+  <!-- CSS & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
-
   <style>
     body {
       background-color: #121212;
@@ -97,7 +96,6 @@
 
     <!-- Followers & Following Section -->
     <div class="follow-section">
-      <!-- Followers -->
       <div class="followers">
         <h5>
           <span id="followerCount" class="badge bg-primary"></span>
@@ -106,7 +104,6 @@
         <button class="btn btn-secondary btn-sm" id="viewFollowersBtn">View Followers</button>
       </div>
 
-      <!-- Following -->
       <div class="following">
         <h5>
           <span id="followingCount" class="badge bg-success"></span>
@@ -125,7 +122,7 @@
     <div class="grid" id="albumsGrid"></div>
   </div>
 
-  <!-- Load your JSON scripts -->
+  <!-- JSON interaction scripts -->
   <script src="getJSONData.js"></script>
   <script src="putJSONData.js"></script>
 
@@ -133,26 +130,25 @@
     const user = JSON.parse(sessionStorage.getItem("loggedInUser"));
     if (!user) window.location.href = "jukebox.html";
 
-    // Update profile header
     document.getElementById("userHeader").textContent = `Welcome, ${user.Username}!`;
 
-    // Function to update follower count dynamically
-    const updateFollowerCount = () => {
-      document.getElementById("followerCount").textContent = user.followers.length || 0;
+    const updateFollowerAndFollowingCounts = () => {
+      document.getElementById("followerCount").textContent = user.followers?.length || 0;
+      document.getElementById("followingCount").textContent = user.following?.length || 0;
     };
 
-    // View followers
+    updateFollowerAndFollowingCounts();
+
     document.getElementById("viewFollowersBtn").addEventListener("click", () => {
-      const followersArray = user.followers;
+      const followersArray = user.followers || [];
       const followersMessage = followersArray.length > 0
         ? followersArray.join("\n")
         : "No followers yet!";
       alert(`Followers:\n${followersMessage}`);
     });
 
-    // View following
     document.getElementById("viewFollowingBtn").addEventListener("click", () => {
-      const followingArray = user.following;
+      const followingArray = user.following || [];
       const followingMessage = followingArray.length > 0
         ? followingArray.join("\n")
         : "You aren't following anyone yet!";
@@ -189,7 +185,6 @@
           <button class="btn btn-sm btn-danger mt-2 delete-btn">Delete Album</button>
         `;
         tile.querySelector(".delete-btn").addEventListener("click", async () => {
-          console.log("Deleting album:", album.title);
           user.selectedAlbums = user.selectedAlbums.filter(a => a.id !== album.id);
           await putJSONData(user);
           sessionStorage.setItem("loggedInUser", JSON.stringify(user));
@@ -199,7 +194,23 @@
       });
     };
 
+    const renderSongs = () => {
+      songsGrid.innerHTML = "";
+      user.selectedSongs.forEach((song) => {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.innerHTML = `
+          <img src="${song.artwork}" alt="cover">
+          <div class="title">${song.title}</div>
+          <div class="artist">${song.artist}</div>
+          <div class="stars">${createStars(song.rating)}</div>
+        `;
+        songsGrid.appendChild(tile);
+      });
+    };
+
     renderAlbums();
+    renderSongs();
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
